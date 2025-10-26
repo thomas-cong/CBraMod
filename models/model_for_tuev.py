@@ -8,6 +8,10 @@ from .cbramod import CBraMod
 class Model(nn.Module):
     def __init__(self, param):
         super(Model, self).__init__()
+        # Determine sequence length based on spectrogram usage
+        seq_len = 51 if param.use_spectrogram else 5
+        total_features = 16 * seq_len * 200
+        
         self.backbone = CBraMod(
             in_dim=200, out_dim=200, d_model=200,
             dim_feedforward=800, seq_len=30,
@@ -28,12 +32,12 @@ class Model(nn.Module):
         elif param.classifier == 'all_patch_reps_onelayer':
             self.classifier = nn.Sequential(
                 Rearrange('b c s d -> b (c s d)'),
-                nn.Linear(16 * 5 * 200, param.num_of_classes),
+                nn.Linear(total_features, param.num_of_classes),
             )
         elif param.classifier == 'all_patch_reps_twolayer':
             self.classifier = nn.Sequential(
                 Rearrange('b c s d -> b (c s d)'),
-                nn.Linear(16 * 5 * 200, 200),
+                nn.Linear(total_features, 200),
                 nn.ELU(),
                 nn.Dropout(param.dropout),
                 nn.Linear(200, param.num_of_classes),
@@ -41,7 +45,7 @@ class Model(nn.Module):
         elif param.classifier == 'all_patch_reps':
             self.classifier = nn.Sequential(
                 Rearrange('b c s d -> b (c s d)'),
-                nn.Linear(16 * 5 * 200, 5 * 200),
+                nn.Linear(total_features, 5 * 200),
                 nn.ELU(),
                 nn.Dropout(param.dropout),
                 nn.Linear(5 * 200, 200),

@@ -8,7 +8,7 @@ from torch.nn import CrossEntropyLoss, BCEWithLogitsLoss, MSELoss
 from tqdm import tqdm
 
 from finetune_evaluator import Evaluator
-
+import wandb
 
 class Trainer(object):
     def __init__(self, params, data_loader, model):
@@ -97,10 +97,12 @@ class Trainer(object):
 
             with torch.no_grad():
                 acc, kappa, f1, cm = self.val_eval.get_metrics_for_multiclass(self.model)
+                train_loss = np.mean(losses)
+                
                 print(
                     "Epoch {} : Training Loss: {:.5f}, acc: {:.5f}, kappa: {:.5f}, f1: {:.5f}, LR: {:.5f}, Time elapsed {:.2f} mins".format(
                         epoch + 1,
-                        np.mean(losses),
+                        train_loss,
                         acc,
                         kappa,
                         f1,
@@ -109,6 +111,18 @@ class Trainer(object):
                     )
                 )
                 print(cm)
+                
+                # Wandb logging
+                if self.params.wandb:
+                    wandb.log({
+                        "epoch": epoch + 1,
+                        "train/loss": train_loss,
+                        "val/balanced_acc": acc,
+                        "val/kappa": kappa,
+                        "val/f1": f1,
+                        "lr": optim_state['param_groups'][0]['lr']
+                    })
+                
                 if kappa > kappa_best:
                     print("kappa increasing....saving weights !! ")
                     print("Val Evaluation: acc: {:.5f}, kappa: {:.5f}, f1: {:.5f}".format(
@@ -135,6 +149,15 @@ class Trainer(object):
                 )
             )
             print(cm)
+            
+            # Log final test results
+            if self.params.wandb:
+                wandb.log({
+                    "final_test/balanced_acc": acc,
+                    "final_test/kappa": kappa,
+                    "final_test/f1": f1
+                })
+            
             if not os.path.isdir(self.params.model_dir):
                 os.makedirs(self.params.model_dir)
             model_path = self.params.model_dir + "/epoch{}_acc_{:.5f}_kappa_{:.5f}_f1_{:.5f}.pth".format(best_f1_epoch, acc, kappa, f1)
@@ -170,10 +193,12 @@ class Trainer(object):
 
             with torch.no_grad():
                 acc, pr_auc, roc_auc, cm = self.val_eval.get_metrics_for_binaryclass(self.model)
+                train_loss = np.mean(losses)
+                
                 print(
                     "Epoch {} : Training Loss: {:.5f}, acc: {:.5f}, pr_auc: {:.5f}, roc_auc: {:.5f}, LR: {:.5f}, Time elapsed {:.2f} mins".format(
                         epoch + 1,
-                        np.mean(losses),
+                        train_loss,
                         acc,
                         pr_auc,
                         roc_auc,
@@ -182,6 +207,18 @@ class Trainer(object):
                     )
                 )
                 print(cm)
+                
+                # Wandb logging
+                if self.params.wandb:
+                    wandb.log({
+                        "epoch": epoch + 1,
+                        "train/loss": train_loss,
+                        "val/balanced_acc": acc,
+                        "val/pr_auc": pr_auc,
+                        "val/roc_auc": roc_auc,
+                        "lr": optim_state['param_groups'][0]['lr']
+                    })
+                
                 if roc_auc > roc_auc_best:
                     print("roc_auc increasing....saving weights !! ")
                     print("Val Evaluation: acc: {:.5f}, pr_auc: {:.5f}, roc_auc: {:.5f}".format(
@@ -208,6 +245,15 @@ class Trainer(object):
                 )
             )
             print(cm)
+            
+            # Log final test results
+            if self.params.wandb:
+                wandb.log({
+                    "final_test/balanced_acc": acc,
+                    "final_test/pr_auc": pr_auc,
+                    "final_test/roc_auc": roc_auc
+                })
+            
             if not os.path.isdir(self.params.model_dir):
                 os.makedirs(self.params.model_dir)
             model_path = self.params.model_dir + "/epoch{}_acc_{:.5f}_pr_{:.5f}_roc_{:.5f}.pth".format(best_f1_epoch, acc, pr_auc, roc_auc)

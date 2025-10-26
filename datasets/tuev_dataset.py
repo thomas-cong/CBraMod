@@ -2,6 +2,8 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 import numpy as np
 from utils.util import to_tensor
+from utils.signaltools import make_spectrogram
+import torchaudio
 import os
 import random
 import lmdb
@@ -14,10 +16,16 @@ class CustomDataset(Dataset):
             self,
             data_dir,
             files,
+            use_spectrogram = False
     ):
         super(CustomDataset, self).__init__()
         self.data_dir = data_dir
         self.files = files
+        self.use_spectrogram = use_spectrogram
+        if use_spectrogram:
+            # Initialize spectrogram transform on CPU
+            hop_length = 20  # 2% of 200 (sequence length after reshape)
+            self.spectrogram_transform = torchaudio.transforms.Spectrogram(n_fft=398, hop_length=hop_length)
 
     def __len__(self):
         return len((self.files))
@@ -29,6 +37,11 @@ class CustomDataset(Dataset):
         label = int(data_dict['label'][0]-1)
         # data = signal.resample(data, 1000, axis=-1)
         data = data.reshape(16, 5, 200)
+        if self.use_spectrogram:
+            # Convert to tensor first, then apply spectrogram
+            data = torch.from_numpy(data).float()
+            data = make_spectrogram(data, self.spectrogram_transform)
+            return data.numpy(), label
         return data/100, label
 
     def collate(self, batch):
@@ -47,9 +60,9 @@ class LoadDataset(object):
         val_files = os.listdir(os.path.join(self.datasets_dir, "processed_eval"))
         test_files = os.listdir(os.path.join(self.datasets_dir, "processed_test"))
 
-        train_set = CustomDataset(os.path.join(self.datasets_dir, "processed_train"), train_files)
-        val_set = CustomDataset(os.path.join(self.datasets_dir, "processed_eval"), val_files)
-        test_set = CustomDataset(os.path.join(self.datasets_dir, "processed_test"), test_files)
+        train_set = CustomDataset(os.path.join(self.datasets_dir, "processed_train"), train_files, self.params.use_spectrogram)
+        val_set = CustomDataset(os.path.join(self.datasets_dir, "processed_eval"), val_files, self.params.use_spectrogram)
+        test_set = CustomDataset(os.path.join(self.datasets_dir, "processed_test"), test_files, self.params.use_spectrogram)
 
         print(len(train_set), len(val_set), len(test_set))
         print(len(train_set)+len(val_set)+len(test_set))

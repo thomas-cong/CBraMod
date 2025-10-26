@@ -240,3 +240,11 @@ def resample(x, num, t=None, axis=0, window=None, domain='time'):
     else:
         new_t = torch.arange(0, num) * (t[1] - t[0]) * Nx / float(num) + t[0]
         return y, new_t
+# Lazy initialization of transform on correct device
+def make_spectrogram(patch, spectrogram_transform):
+    flat_patch = patch.flatten(-2)
+    spectrogram = spectrogram_transform(flat_patch)
+    # Apply log-scale for better normalization (add small epsilon to avoid log(0))
+    spectrogram = torch.log1p(spectrogram)
+    spectrogram = spectrogram.permute(0,2,1).contiguous()
+    return spectrogram

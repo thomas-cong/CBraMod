@@ -10,7 +10,7 @@ from finetune_trainer import Trainer
 from models import model_for_faced, model_for_seedv, model_for_physio, model_for_shu, model_for_isruc, model_for_chb, \
     model_for_speech, model_for_mumtaz, model_for_seedvig, model_for_stress, model_for_tuev, model_for_tuab, \
     model_for_bciciv2a
-
+import wandb
 
 def main():
     parser = argparse.ArgumentParser(description='Big model downstream')
@@ -53,10 +53,23 @@ def main():
     parser.add_argument('--foundation_dir', type=str,
                         default='pretrained_weights/pretrained_weights.pth',
                         help='foundation_dir')
+    parser.add_argument('--use_spectrogram', action='store_true', default=False, help='use_spectrogram')
+    parser.add_argument('--wandb', action='store_true', default=False, help='use wandb logging')
 
     params = parser.parse_args()
     print(params)
-
+    run_name = f"CBraMod_B{params.batch_size}_E{params.epochs}_lr{params.lr}_{params.downstream_dataset}"
+    params.run_name = run_name
+    if params.use_spectrogram:
+        run_name += "_spectrogram"
+    if params.wandb:
+        wandb.init(
+                name=run_name,
+                project="cbramod",
+                entity='learning_to_adapt', # team entity
+                config=vars(params),
+                dir=params.model_dir,
+                )
     setup_seed(params.seed)
     torch.cuda.set_device(params.cuda)
     print('The downstream dataset is {}'.format(params.downstream_dataset))

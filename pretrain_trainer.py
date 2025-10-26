@@ -6,6 +6,7 @@ from torchinfo import summary
 from tqdm import tqdm
 
 from utils.util import generate_mask
+import wandb
 
 
 class Trainer(object):
@@ -22,9 +23,9 @@ class Trainer(object):
 
         self.data_length = len(self.data_loader)
 
-        summary(self.model, input_size=(1, 19, 30, 200))
+        summary(self.model, input_size=(1, 19, 30, self.params.in_dim))
 
-        macs, params = get_model_complexity_info(self.model, (19, 30, 200), as_strings=True,
+        macs, params = get_model_complexity_info(self.model, (19, 30, self.params.in_dim), as_strings=True,
                                                  print_per_layer_stat=True, verbose=True)
         print('{:<30}  {:<8}'.format('Computational complexity: ', macs))
         print('{:<30}  {:<8}'.format('Number of parameters: ', params))
@@ -85,11 +86,23 @@ class Trainer(object):
                 self.optimizer.step()
                 self.optimizer_scheduler.step()
                 losses.append(loss.data.cpu().numpy())
+            
             mean_loss = np.mean(losses)
             learning_rate = self.optimizer.state_dict()['param_groups'][0]['lr']
             print(f'Epoch {epoch+1}: Training Loss: {mean_loss:.6f}, Learning Rate: {learning_rate:.6f}')
+            
+            # Log to wandb
+            if hasattr(self.params, 'wandb') and self.params.wandb:
+                log = {
+                    "train/loss": mean_loss,
+                    "epoch": epoch + 1,
+                    "lr": learning_rate
+                }
+                wandb.log(log)
+            
             if  mean_loss < best_loss:
-                model_path = rf'{self.params.model_dir}/epoch{epoch+1}_loss{mean_loss}.pth'
+                model_path = rf'{self.params.model_dir}/{self.params.run_name}_epoch{epoch+1}_loss{mean_loss}.pth'
                 torch.save(self.model.state_dict(), model_path)
                 print("model save in " + model_path)
                 best_loss = mean_loss
+                
